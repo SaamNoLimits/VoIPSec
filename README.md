@@ -231,6 +231,20 @@ chmod +x scripts/setup.sh
 <details>
 <summary>Click to expand manual installation steps</summary>
 
+```mermaid
+graph LR
+    A[🏗️ Build Services] --> B[🗄️ Init Database]
+    B --> C[👤 Create Admin]
+    C --> D[🌐 Access Web UI]
+    D --> E[🔒 Setup SSL]
+    
+    style A fill:#3498db,color:#fff
+    style B fill:#e67e22,color:#fff
+    style C fill:#9b59b6,color:#fff
+    style D fill:#27ae60,color:#fff
+    style E fill:#e74c3c,color:#fff
+```
+
 ```bash
 # 1. 🏗️ Build and start services
 docker-compose up -d
@@ -429,22 +443,19 @@ VoIP/
 ### 🏃‍♂️ Development Workflow
 
 ```mermaid
-gitgraph
-    commit id: "Initial Setup"
-    branch feature/auth
-    checkout feature/auth
-    commit id: "Add authentication"
-    commit id: "Add tests"
-    checkout main
-    merge feature/auth
-    commit id: "Release v1.0"
-    branch feature/qos
-    checkout feature/qos
-    commit id: "QoS implementation"
-    commit id: "Performance tests"
-    checkout main
-    merge feature/qos
-    commit id: "Release v1.1"
+graph TD
+    A[🚀 Initial Setup] --> B[🔐 Authentication Feature]
+    B --> C[✅ Add Tests]
+    C --> D[🔄 Merge to Main]
+    D --> E[📦 Release v1.0]
+    E --> F[⚡ QoS Feature]
+    F --> G[🧪 Performance Tests]
+    G --> H[🔄 Merge to Main]
+    H --> I[📦 Release v1.1]
+    
+    style A fill:#e74c3c,color:#fff
+    style E fill:#27ae60,color:#fff
+    style I fill:#27ae60,color:#fff
 ```
 
 ---
@@ -452,33 +463,33 @@ gitgraph
 ## 📈 Roadmap
 
 ```mermaid
-timeline
-    title VoIP Solution Roadmap
+gantt
+    title VoIP Solution Development Roadmap
+    dateFormat  YYYY-MM-DD
+    section Core Features
+    Asterisk Integration    :done, core1, 2024-10-01, 2024-11-15
+    Basic Web UI           :done, core2, 2024-11-01, 2024-12-15
+    SIP Authentication     :done, core3, 2024-12-01, 2024-12-31
     
-    section Q4 2024
-        Core Features    : Asterisk integration
-                        : Basic web UI
-                        : SIP authentication
+    section Security
+    TLS/SRTP Encryption    :active, sec1, 2024-12-15, 2025-02-28
+    Firewall Integration   :sec2, 2025-01-15, 2025-03-15
+    Access Controls        :sec3, 2025-02-01, 2025-03-31
     
-    section Q1 2025
-        Security         : TLS/SRTP encryption
-                        : Firewall integration
-                        : Access controls
+    section QoS & Performance
+    Traffic Shaping        :qos1, 2025-03-01, 2025-04-30
+    Quality Monitoring     :qos2, 2025-04-01, 2025-05-31
+    Auto-scaling          :qos3, 2025-05-01, 2025-06-30
     
-    section Q2 2025
-        QoS & Performance : Traffic shaping
-                         : Call quality monitoring
-                         : Auto-scaling
+    section Advanced Features
+    AI Analytics          :adv1, 2025-06-01, 2025-08-31
+    Mobile Apps           :adv2, 2025-07-01, 2025-09-30
+    Cloud Integration     :adv3, 2025-08-01, 2025-10-31
     
-    section Q3 2025
-        Advanced Features : AI-powered analytics
-                         : Mobile applications
-                         : Cloud integration
-    
-    section Q4 2025
-        Enterprise       : Multi-tenant support
-                        : Advanced reporting
-                        : Compliance tools
+    section Enterprise
+    Multi-tenant Support  :ent1, 2025-09-01, 2025-11-30
+    Advanced Reporting    :ent2, 2025-10-01, 2025-12-31
+    Compliance Tools      :ent3, 2025-11-01, 2026-01-31
 ```
 
 ---
