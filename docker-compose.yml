@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # Asterisk PBX Core
+  asterisk:
+    build: 
+      context: ./docker/asterisk
+      dockerfile: Dockerfile
+    container_name: voip-asterisk
+    hostname: asterisk
+    restart: unless-stopped
+    ports:
+      - "5060:5060/udp"  # SIP
+      - "5060:5060/tcp"  # SIP over TCP
+      - "5061:5061/tcp"  # SIP TLS
+      - "10000-10100:10000-10100/udp"  # RTP
+    volumes:
+      - ./asterisk/config:/etc/asterisk
+      - ./asterisk/sounds:/var/lib/asterisk/sounds/custom
+      - ./asterisk/recordings:/var/spool/asterisk/monitor
+      - ./asterisk/voicemail:/var/spool/asterisk/voicemail
+      - ./asterisk/logs:/var/log/asterisk
+      - asterisk_data:/var/lib/asterisk
+    environment:
+      - ASTERISK_UID=1001
+      - ASTERISK_GID=1001
+    networks:
+      - voip-network
+    depends_on:
+      - database
+      - redis
+
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: voip-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: voip_enterprise
+      POSTGRES_USER: voip_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-VoIP_Secure_2024!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - voip-network
+    ports:
+      - "5432:5432"
+
+  # Redis Cache & Sessions
+  redis:
+    image: redis:7-alpine
+    container_name: voip-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-Redis_Secure_2024!}
+    volumes:
+      - redis_data:/data
+    networks:
+      - voip-network
+    ports:
+      - "6379:6379"
+
+  # API Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: voip-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_NAME=voip_enterprise
+      - DB_USER=voip_admin
+      - DB_PASSWORD=${DB_PASSWORD:-VoIP_Secure_2024!}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-Redis_Secure_2024!}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this}
+      - ASTERISK_HOST=asterisk
+      - ASTERISK_AMI_USER=admin
+      - ASTERISK_AMI_SECRET=${ASTERISK_AMI_SECRET:-AMI_Secret_2024!}
+    volumes:
+      - ./asterisk/recordings:/app/recordings:ro
+      - ./api/logs:/app/logs
+    networks:
+      - voip-network
+    depends_on:
+      - database
+      - redis
+      - asterisk
+    ports:
+      - "8080:8080"
+
+  # Web UI Frontend
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: voip-web-ui
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_WS_URL=ws://localhost:8080
+    networks:
+      - voip-network
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: voip-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - voip-network
+    depends_on:
+      - web-ui
+      - api
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: voip-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - voip-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: voip-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - voip-network
+    depends_on:
+      - prometheus
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: voip-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - voip-network
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+volumes:
+  postgres_data:
+  redis_data:
+  asterisk_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  voip-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
